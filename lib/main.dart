@@ -10,14 +10,14 @@ void main() {
   runApp(const CarromAimBotApp());
 }
 
-// Overlay entrypoint invoked when Android floating window launches
+// System Floating Overlay entry point
 @pragma("vm:entry-point")
 void overlayMain() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(
     const MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: CarromFloatingOverlay(),
+      home: CarromInGameOverlay(),
     ),
   );
 }
@@ -58,25 +58,20 @@ class CarromBotHome extends StatefulWidget {
 }
 
 class _CarromBotHomeState extends State<CarromBotHome> {
-  // Board setup
   final double boardSize = 400.0;
   final double strikerRadius = 18.0;
   final double coinRadius = 14.0;
   final double cushionInset = 28.0;
 
-  // Aim state
   late Offset strikerPos;
-  double aimAngle = -math.pi / 2; // Pointing upwards initially
-  double power = 0.75;
+  double aimAngle = -math.pi / 2;
   bool showCushionBounce = true;
   bool showCoinDeflection = true;
   bool isOverlayActive = false;
 
-  // Coins positions & types
   late List<Offset> coins;
   late List<CoinType> coinTypes;
 
-  // Dragging state
   int? draggedCoinIndex;
   bool isDraggingStriker = false;
   bool isAiming = false;
@@ -85,23 +80,30 @@ class _CarromBotHomeState extends State<CarromBotHome> {
   void initState() {
     super.initState();
     _resetPositions();
+    _checkOverlayState();
+  }
+
+  Future<void> _checkOverlayState() async {
+    try {
+      final active = await FlutterOverlayWindow.isActive();
+      if (mounted) setState(() => isOverlayActive = active);
+    } catch (_) {}
   }
 
   void _resetPositions() {
     final center = boardSize / 2;
     strikerPos = Offset(center, boardSize - cushionInset - 40.0);
 
-    // Initial default carrom coin cluster around center
     coins = [
       Offset(center, center), // Queen
-      Offset(center - 24, center), // White
-      Offset(center + 24, center), // White
-      Offset(center, center - 24), // Black
-      Offset(center, center + 24), // Black
-      Offset(center - 18, center - 20), // Black
-      Offset(center + 18, center + 20), // White
-      Offset(center - 18, center + 20), // White
-      Offset(center + 18, center - 20), // Black
+      Offset(center - 24, center),
+      Offset(center + 24, center),
+      Offset(center, center - 24),
+      Offset(center, center + 24),
+      Offset(center - 18, center - 20),
+      Offset(center + 18, center + 20),
+      Offset(center - 18, center + 20),
+      Offset(center + 18, center - 20),
     ];
 
     coinTypes = [
@@ -127,7 +129,10 @@ class _CarromBotHomeState extends State<CarromBotHome> {
         if (res != true) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Overlay permission denied')),
+              const SnackBar(
+                content: Text('⚠️ Please enable "Display over other apps" permission in Settings'),
+                backgroundColor: Colors.redAccent,
+              ),
             );
           }
           return;
@@ -139,22 +144,31 @@ class _CarromBotHomeState extends State<CarromBotHome> {
         await FlutterOverlayWindow.closeOverlay();
         setState(() => isOverlayActive = false);
       } else {
+        // Show Full Screen overlay so guidelines float right on top of Carrom Disc Pool
         await FlutterOverlayWindow.showOverlay(
-          enableDrag: true,
+          enableDrag: false,
           overlayTitle: "Carrom Aim Guideline",
-          overlayContent: 'Aim bot active',
+          overlayContent: 'Aim bot active on Carrom Pool',
           flag: OverlayFlag.defaultFlag,
           visibility: NotificationVisibility.visibilityPublic,
           positionGravity: PositionGravity.auto,
-          width: 900,
-          height: 900,
+          height: WindowSize.matchParent,
+          width: WindowSize.matchParent,
         );
         setState(() => isOverlayActive = true);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('🎯 Floating Overlay Started! Switch to Carrom Disc Pool.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Overlay not supported on this platform: $e')),
+          SnackBar(content: Text('Error launching overlay: $e')),
         );
       }
     }
@@ -173,7 +187,7 @@ class _CarromBotHomeState extends State<CarromBotHome> {
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: const Color(0xFF00E5FF).withOpacity(0.2),
+                color: const Color(0xFF00E5FF).withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Icon(Icons.gps_fixed, color: Color(0xFF00E5FF)),
@@ -184,10 +198,10 @@ class _CarromBotHomeState extends State<CarromBotHome> {
               children: [
                 Text(
                   'Carrom Aim Assistant',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  'Real-time Collision & Trajectory Guideline',
+                  'Collision & Trajectory Predictor',
                   style: TextStyle(fontSize: 11, color: Colors.white70),
                 ),
               ],
@@ -196,29 +210,18 @@ class _CarromBotHomeState extends State<CarromBotHome> {
         ),
         actions: [
           IconButton(
-            tooltip: 'Enter PiP (Picture in Picture)',
+            tooltip: 'Enter PiP',
             icon: const Icon(Icons.picture_in_picture_alt, color: Color(0xFF00E5FF)),
             onPressed: () {
               PIPView.of(context)?.presentBelow(
-                Scaffold(
+                const Scaffold(
                   backgroundColor: Colors.black,
                   body: Center(
-                    child: Text(
-                      'Background App',
-                      style: TextStyle(color: Colors.white.withOpacity(0.5)),
-                    ),
+                    child: Text('Underlying Game Screen', style: TextStyle(color: Colors.white30)),
                   ),
                 ),
               );
             },
-          ),
-          IconButton(
-            tooltip: 'Launch System Floating Overlay',
-            icon: Icon(
-              isOverlayActive ? Icons.layers_clear : Icons.layers,
-              color: isOverlayActive ? Colors.greenAccent : Colors.white,
-            ),
-            onPressed: _toggleSystemOverlay,
           ),
           IconButton(
             tooltip: 'Reset board',
@@ -233,6 +236,59 @@ class _CarromBotHomeState extends State<CarromBotHome> {
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Column(
               children: [
+                // Quick Launch Card
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: isOverlayActive
+                          ? [const Color(0xFF064E3B), const Color(0xFF047857)]
+                          : [const Color(0xFF0F2027), const Color(0xFF203A43)],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isOverlayActive ? const Color(0xFF10B981) : const Color(0xFF00E5FF),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isOverlayActive ? Icons.check_circle : Icons.sports_esports,
+                        color: isOverlayActive ? Colors.greenAccent : const Color(0xFF00E5FF),
+                        size: 32,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isOverlayActive ? 'Floating Overlay Active' : 'Start Over Carrom Game',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            ),
+                            Text(
+                              isOverlayActive
+                                  ? 'Switch to Carrom Disc Pool to use aim guidelines!'
+                                  : 'Floats translucent extended guidelines directly over the game board.',
+                              style: const TextStyle(fontSize: 11, color: Colors.white70),
+                            ),
+                          ],
+                        ),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isOverlayActive ? Colors.redAccent : const Color(0xFF00E5FF),
+                          foregroundColor: isOverlayActive ? Colors.white : Colors.black,
+                        ),
+                        onPressed: _toggleSystemOverlay,
+                        child: Text(isOverlayActive ? 'Stop' : 'Start'),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
                 _buildControlHeader(),
                 const SizedBox(height: 12),
                 _buildInteractiveBoard(),
@@ -248,7 +304,7 @@ class _CarromBotHomeState extends State<CarromBotHome> {
 
   Widget _buildFloatingPipContent() {
     return Container(
-      color: Colors.black.withOpacity(0.65),
+      color: Colors.black.withValues(alpha: 0.65),
       child: Center(
         child: AspectRatio(
           aspectRatio: 1.0,
@@ -288,10 +344,7 @@ class _CarromBotHomeState extends State<CarromBotHome> {
               Container(
                 width: 12,
                 height: 12,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color(0xFF00E5FF),
-                ),
+                decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF00E5FF)),
               ),
               const SizedBox(width: 6),
               const Text('Striker Line', style: TextStyle(fontSize: 12)),
@@ -302,10 +355,7 @@ class _CarromBotHomeState extends State<CarromBotHome> {
               Container(
                 width: 12,
                 height: 12,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color(0xFFFF9100),
-                ),
+                decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFFFF9100)),
               ),
               const SizedBox(width: 6),
               const Text('Coin Path', style: TextStyle(fontSize: 12)),
@@ -316,10 +366,7 @@ class _CarromBotHomeState extends State<CarromBotHome> {
               Container(
                 width: 12,
                 height: 12,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color(0xFF00E676),
-                ),
+                decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF00E676)),
               ),
               const SizedBox(width: 6),
               const Text('Pocket Target', style: TextStyle(fontSize: 12)),
@@ -338,7 +385,7 @@ class _CarromBotHomeState extends State<CarromBotHome> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF00E5FF).withOpacity(0.15),
+              color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
               blurRadius: 20,
               spreadRadius: 2,
             ),
@@ -349,21 +396,16 @@ class _CarromBotHomeState extends State<CarromBotHome> {
           child: GestureDetector(
             onPanStart: (details) {
               final pos = details.localPosition;
-              // Check if touching striker
               if ((pos - strikerPos).distance <= strikerRadius * 1.8) {
                 isDraggingStriker = true;
                 return;
               }
-
-              // Check if touching any coin
               for (int i = 0; i < coins.length; i++) {
                 if ((pos - coins[i]).distance <= coinRadius * 1.8) {
                   draggedCoinIndex = i;
                   return;
                 }
               }
-
-              // Else we are aiming striker towards touch point
               isAiming = true;
               setState(() {
                 final diff = pos - strikerPos;
@@ -380,14 +422,9 @@ class _CarromBotHomeState extends State<CarromBotHome> {
               );
 
               if (isDraggingStriker) {
-                setState(() {
-                  // Keep striker on baseline or allow free move in practice
-                  strikerPos = clamped;
-                });
+                setState(() => strikerPos = clamped);
               } else if (draggedCoinIndex != null) {
-                setState(() {
-                  coins[draggedCoinIndex!] = clamped;
-                });
+                setState(() => coins[draggedCoinIndex!] = clamped);
               } else if (isAiming) {
                 setState(() {
                   final diff = pos - strikerPos;
@@ -436,14 +473,8 @@ class _CarromBotHomeState extends State<CarromBotHome> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Striker Baseline Position',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-              Text(
-                '${(strikerPos.dx).toInt()} px',
-                style: const TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold),
-              ),
+              const Text('Striker Baseline Position', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              Text('${(strikerPos.dx).toInt()} px', style: const TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold)),
             ],
           ),
           Slider(
@@ -454,24 +485,14 @@ class _CarromBotHomeState extends State<CarromBotHome> {
               boardSize - cushionInset - strikerRadius - 20,
             ),
             activeColor: const Color(0xFF00E5FF),
-            onChanged: (val) {
-              setState(() {
-                strikerPos = Offset(val, strikerPos.dy);
-              });
-            },
+            onChanged: (val) => setState(() => strikerPos = Offset(val, strikerPos.dy)),
           ),
           const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Fine Angle Adjustment (Degree)',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-              Text(
-                '${(aimAngle * 180 / math.pi).toStringAsFixed(1)}°',
-                style: const TextStyle(color: Color(0xFFFF9100), fontWeight: FontWeight.bold),
-              ),
+              const Text('Fine Angle Adjustment (Degree)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              Text('${(aimAngle * 180 / math.pi).toStringAsFixed(1)}°', style: const TextStyle(color: Color(0xFFFF9100), fontWeight: FontWeight.bold)),
             ],
           ),
           Slider(
@@ -479,11 +500,7 @@ class _CarromBotHomeState extends State<CarromBotHome> {
             max: 0,
             value: aimAngle.clamp(-math.pi, 0),
             activeColor: const Color(0xFFFF9100),
-            onChanged: (val) {
-              setState(() {
-                aimAngle = val;
-              });
-            },
+            onChanged: (val) => setState(() => aimAngle = val),
           ),
           const Divider(color: Colors.white12, height: 24),
           Row(
@@ -492,7 +509,7 @@ class _CarromBotHomeState extends State<CarromBotHome> {
               const Text('Cushion Bank Bounce Lines'),
               Switch(
                 value: showCushionBounce,
-                activeColor: const Color(0xFF00E5FF),
+                activeThumbColor: const Color(0xFF00E5FF),
                 onChanged: (v) => setState(() => showCushionBounce = v),
               ),
             ],
@@ -503,18 +520,10 @@ class _CarromBotHomeState extends State<CarromBotHome> {
               const Text('Coin Path & Pocket Predictor'),
               Switch(
                 value: showCoinDeflection,
-                activeColor: const Color(0xFF00E676),
+                activeThumbColor: const Color(0xFF00E676),
                 onChanged: (v) => setState(() => showCoinDeflection = v),
               ),
             ],
-          ),
-          const SizedBox(height: 8),
-          Center(
-            child: Text(
-              '💡 Touch board to aim • Drag coins to match your game state • Tap PiP button to float over game',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
-            ),
           ),
         ],
       ),
@@ -522,24 +531,28 @@ class _CarromBotHomeState extends State<CarromBotHome> {
   }
 }
 
-/// Floating Overlay widget when launched in system overlay mode
-class CarromFloatingOverlay extends StatefulWidget {
-  const CarromFloatingOverlay({super.key});
+/// In-Game Floating HUD Overlay
+class CarromInGameOverlay extends StatefulWidget {
+  const CarromInGameOverlay({super.key});
 
   @override
-  State<CarromFloatingOverlay> createState() => _CarromFloatingOverlayState();
+  State<CarromInGameOverlay> createState() => _CarromInGameOverlayState();
 }
 
-class _CarromFloatingOverlayState extends State<CarromFloatingOverlay> {
-  final double boardSize = 340.0;
-  Offset strikerPos = const Offset(170, 290);
+class _CarromInGameOverlayState extends State<CarromInGameOverlay> {
+  // Screen and board dimensions
+  double boardPixelSize = 360.0;
+  Offset strikerPos = const Offset(180, 280);
   double aimAngle = -math.pi / 2;
+  bool isTransparentMode = false;
+
+  // Real coin positions on board for simulation
   List<Offset> coins = [
-    const Offset(170, 170),
-    const Offset(140, 170),
-    const Offset(200, 170),
-    const Offset(170, 140),
-    const Offset(170, 200),
+    const Offset(180, 180), // Queen Center
+    const Offset(160, 180),
+    const Offset(200, 180),
+    const Offset(180, 160),
+    const Offset(180, 200),
   ];
   List<CoinType> coinTypes = [
     CoinType.queen,
@@ -553,64 +566,107 @@ class _CarromFloatingOverlayState extends State<CarromFloatingOverlay> {
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
-      child: Center(
-        child: Container(
-          width: boardSize,
-          height: boardSize + 50,
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.35),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0x6600E5FF), width: 1.5),
+      child: Stack(
+        children: [
+          // 1. Aim line overlay canvas (matches Carrom board area)
+          Center(
+            child: SizedBox(
+              width: boardPixelSize,
+              height: boardPixelSize,
+              child: CustomPaint(
+                painter: AimLinesPainter(
+                  strikerPos: strikerPos,
+                  aimDir: Offset(math.cos(aimAngle), math.sin(aimAngle)),
+                  coins: coins,
+                  coinTypes: coinTypes,
+                  boardSize: boardPixelSize,
+                  showCushionReflection: true,
+                  showCoinDeflection: true,
+                  drawBoardBackground: !isTransparentMode,
+                ),
+              ),
+            ),
           ),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: const BoxDecoration(
-                  color: Color(0xAA0F172A),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+
+          // 2. Floating Controller Pill at top
+          Positioned(
+            top: 40,
+            left: 20,
+            right: 20,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xEE0F172A),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: const Color(0xFF00E5FF), width: 1.5),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black45, blurRadius: 10),
+                  ],
                 ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      '🎯 Aim Bot PiP Guideline',
-                      style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                    const Icon(Icons.gps_fixed, color: Color(0xFF00E5FF), size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Aim: ${(aimAngle * 180 / math.pi).toStringAsFixed(0)}°',
+                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(width: 12),
+                    IconButton(
+                      icon: Icon(
+                        isTransparentMode ? Icons.layers : Icons.layers_clear,
+                        color: Colors.amberAccent,
+                        size: 20,
+                      ),
+                      tooltip: 'Toggle Transparent HUD',
+                      onPressed: () => setState(() => isTransparentMode = !isTransparentMode),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white, size: 16),
+                      icon: const Icon(Icons.close, color: Colors.redAccent, size: 20),
+                      tooltip: 'Close Overlay',
                       onPressed: () => FlutterOverlayWindow.closeOverlay(),
                     ),
                   ],
                 ),
               ),
-              Expanded(
-                child: GestureDetector(
-                  onPanUpdate: (details) {
-                    final pos = details.localPosition;
-                    final diff = pos - strikerPos;
-                    setState(() {
-                      aimAngle = math.atan2(diff.dy, diff.dx);
-                    });
-                  },
-                  child: CustomPaint(
-                    size: Size(boardSize, boardSize),
-                    painter: AimLinesPainter(
-                      strikerPos: strikerPos,
-                      aimDir: Offset(math.cos(aimAngle), math.sin(aimAngle)),
-                      coins: coins,
-                      coinTypes: coinTypes,
-                      boardSize: boardSize,
-                      showCushionReflection: true,
-                      showCoinDeflection: true,
-                      drawBoardBackground: false, // Transparent so user sees game underneath!
+            ),
+          ),
+
+          // 3. Draggable Aim Joystick / Handle
+          Positioned(
+            bottom: 30,
+            left: 20,
+            right: 20,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xCC1E293B),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white24),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Drag slider to align with in-game arrow',
+                      style: TextStyle(color: Colors.white70, fontSize: 11),
                     ),
-                  ),
+                    Slider(
+                      value: aimAngle.clamp(-math.pi, 0),
+                      min: -math.pi,
+                      max: 0,
+                      activeColor: const Color(0xFF00E5FF),
+                      onChanged: (val) => setState(() => aimAngle = val),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
